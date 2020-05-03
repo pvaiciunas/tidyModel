@@ -125,4 +125,46 @@ ggplot(plot_data, aes(x = food_regime)) +
 
 # Modeling with a new engine ----------------------------------------------
 
+# Now let's say we wanted to do the same analysis, but decided that we want to go a bayseian route. 
+# We'll need to choose a prior distribution for each model parameter that represents the possible
+# values of the paramters (before being exposed to any observed data). 
+# 
+# In this case, the priors will be chosen so that the distirbtion is bell shaped, but will
+# be conservative and make the priors wider with a caushy dstirbution to fatten up the tails.
+# 
+# Will use a 'stan' engine. This exsits in the rstanarm package, but linear_reg() also has one,
+# so we can use it there, and pass the priors in the set_engine part of the function
 
+# Set the prior distribution
+prior_dist <- rstanarm::student_t(df = 1)
+
+set.seed(123)
+
+# make the parsnip model
+bayes_mod <- 
+  linear_reg() %>% 
+  set_engine("stan",
+             prior_intercept = prior_dist,
+             prior = prior_dist)
+
+# train the model
+bayes_fit <- 
+  bayes_mod %>% 
+  fit(width ~ initial_volume * food_regime, data = urchins)
+
+print(bayes_fit, digits = 5)
+
+# We can again wrap this in the tidy() funciton to simplify the output
+tidy(bayes_fit)
+
+# An plot everything again\
+bayes_plot_data <- 
+  new_points %>% 
+  bind_cols(predict(bayes_fit, new_data = new_points)) %>% 
+  bind_cols(predict(bayes_fit, new_data = new_points, type = "conf_int"))
+
+ggplot(bayes_plot_data, aes(x = food_regime)) + 
+  geom_point(aes(y = .pred)) + 
+  geom_errorbar(aes(ymin = .pred_lower, ymax = .pred_upper), width = .2) + 
+  labs(y = "urchin size") + 
+  ggtitle("Bayesian model with t(1) prior distribution")
